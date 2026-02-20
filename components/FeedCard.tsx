@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, TextInput, Share, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { Heart, MapPin, Clock, MessageCircle, Send, Share2 } from 'lucide-react-native';
+import { Heart, MapPin, Clock, MessageCircle, Send, Share2, Flame } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { MartiniLog, Comment } from '@/types';
@@ -13,6 +13,7 @@ interface FeedCardProps {
   onComment?: (id: string, text: string) => void;
   onBarPress?: (barId: string) => void;
   onUserPress?: (userId: string) => void;
+  streakCount?: number;
 }
 
 function formatTimeAgo(timestamp: string): string {
@@ -28,11 +29,25 @@ function formatTimeAgo(timestamp: string): string {
   return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress }: FeedCardProps) {
+function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streakCount }: FeedCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const flamePulse = useRef(new Animated.Value(1)).current;
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const comments = log.comments ?? [];
+
+  React.useEffect(() => {
+    if (streakCount && streakCount >= 3) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flamePulse, { toValue: 1.2, duration: 800, useNativeDriver: true }),
+          Animated.timing(flamePulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [streakCount, flamePulse]);
 
   const handleLike = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -73,9 +88,17 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress }: Feed
           <Image source={{ uri: log.userAvatar }} style={styles.avatar} />
         </Pressable>
         <View style={styles.headerText}>
-          <Pressable onPress={() => onUserPress?.(log.userId)}>
-            <Text style={styles.userName}>{log.userName}</Text>
-          </Pressable>
+          <View style={styles.userNameRow}>
+            <Pressable onPress={() => onUserPress?.(log.userId)}>
+              <Text style={styles.userName}>{log.userName}</Text>
+            </Pressable>
+            {streakCount != null && streakCount > 0 && (
+              <Animated.View style={[styles.streakBadge, { transform: [{ scale: streakCount >= 3 ? flamePulse : 1 }] }]}>
+                <Flame size={11} color="#FF6B35" fill="#FF6B35" />
+                <Text style={styles.streakText}>{streakCount}</Text>
+              </Animated.View>
+            )}
+          </View>
           <View style={styles.locationRow}>
             <MapPin size={12} color={Colors.goldMuted} />
             <Pressable onPress={() => onBarPress?.(log.barId)}>
@@ -205,6 +228,25 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 15,
     fontWeight: '600' as const,
+  },
+  userNameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  streakBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    gap: 2,
+  },
+  streakText: {
+    color: '#FF6B35',
+    fontSize: 11,
+    fontWeight: '700' as const,
   },
   locationRow: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, Animated, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
-import { Flame, Star, MapPinned } from 'lucide-react-native';
+import { Flame, Star, MapPinned, Crown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -91,6 +91,12 @@ export default function LeaderboardScreen() {
                 />
               </View>
               <Text style={styles.podiumName} numberOfLines={1}>{entry.userName.split(' ')[0]}</Text>
+              {entry.title && (
+                <View style={styles.podiumTitle}>
+                  <Crown size={9} color="#FFD700" />
+                  <Text style={styles.podiumTitleText} numberOfLines={1}>{entry.title}</Text>
+                </View>
+              )}
               <Text style={styles.podiumValue}>
                 {Number.isInteger(entry.value) ? entry.value : entry.value.toFixed(1)}
               </Text>
@@ -218,6 +224,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     textAlign: 'center' as const,
+  },
+  podiumTitle: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 2,
+  },
+  podiumTitleText: {
+    color: '#FFD700',
+    fontSize: 9,
+    fontWeight: '700' as const,
   },
   podiumValue: {
     color: Colors.goldLight,

@@ -17,7 +17,7 @@ const CITIES = ['All', 'New York', 'Brooklyn', 'Manhattan', 'Chicago'];
 const RATING_FILTERS = ['All', '5 🫒', '4+ 🫒', '3+ 🫒'];
 
 export default function FeedScreen() {
-  const { feedLogs, toggleLike, addComment, isLoading, refreshFeed } = useMartini();
+  const { feedLogs, toggleLike, addComment, isLoading, refreshFeed, userStreaks } = useMartini();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,8 +88,15 @@ export default function FeedScreen() {
   }, [addComment]);
 
   const renderItem = useCallback(({ item }: { item: MartiniLog }) => (
-    <FeedCard log={item} onLike={toggleLike} onComment={handleComment} onBarPress={handleBarPress} onUserPress={handleUserPress} />
-  ), [toggleLike, handleComment, handleBarPress, handleUserPress]);
+    <FeedCard
+      log={item}
+      onLike={toggleLike}
+      onComment={handleComment}
+      onBarPress={handleBarPress}
+      onUserPress={handleUserPress}
+      streakCount={userStreaks[item.userId] ?? 0}
+    />
+  ), [toggleLike, handleComment, handleBarPress, handleUserPress, userStreaks]);
 
   const keyExtractor = useCallback((item: MartiniLog) => item.id, []);
 

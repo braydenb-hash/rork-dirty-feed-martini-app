@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, Pressable, Alert, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Wine, MapPin, Star, Trash2 } from 'lucide-react-native';
+import { Wine, MapPin, Star, Trash2, Flame, Crown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -12,7 +12,7 @@ import OliveRating from '@/components/OliveRating';
 import { Badge, MartiniLog } from '@/types';
 
 export default function ProfileScreen() {
-  const { user, badges, myLogs, deleteLog } = useMartini();
+  const { user, badges, myLogs, deleteLog, userTitles } = useMartini();
   const insets = useSafeAreaInsets();
 
   const earnedBadges = badges.filter(b => b.earned);
@@ -53,6 +53,23 @@ export default function ProfileScreen() {
           <Image source={{ uri: user.avatar }} style={styles.avatar} />
           <Text style={styles.name}>{user.name}</Text>
           <Text style={styles.username}>{user.username}</Text>
+          {user.streakCount > 0 && (
+            <View style={styles.streakRow}>
+              <Flame size={16} color="#FF6B35" fill="#FF6B35" />
+              <Text style={styles.streakValue}>{user.streakCount}</Text>
+              <Text style={styles.streakLabel}>day streak</Text>
+            </View>
+          )}
+          {userTitles[user.id] && userTitles[user.id].length > 0 && (
+            <View style={styles.titlesRow}>
+              {userTitles[user.id].map(title => (
+                <View key={title} style={styles.profileTitleBadge}>
+                  <Crown size={12} color="#FFD700" />
+                  <Text style={styles.profileTitleText}>{title}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           <Text style={styles.city}>
             <MapPin size={12} color={Colors.gray} /> {user.city}
           </Text>
@@ -185,6 +202,50 @@ const styles = StyleSheet.create({
     color: Colors.goldLight,
     fontSize: 15,
     marginTop: 2,
+  },
+  streakRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginTop: 8,
+    backgroundColor: 'rgba(255, 107, 53, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  streakValue: {
+    color: '#FF6B35',
+    fontSize: 18,
+    fontWeight: '800' as const,
+  },
+  streakLabel: {
+    color: '#FF6B35',
+    fontSize: 13,
+    fontWeight: '500' as const,
+    opacity: 0.8,
+  },
+  titlesRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    marginTop: 8,
+  },
+  profileTitleBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  profileTitleText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '700' as const,
   },
   city: {
     color: Colors.gray,

@@ -9,6 +9,8 @@ export interface User {
   barsVisited: number;
   badges: Badge[];
   joinedDate: string;
+  streakCount: number;
+  lastLogDate?: string;
 }
 
 export interface MartiniLog {
@@ -72,4 +74,7 @@ export interface LeaderboardEntry {
   userAvatar: string;
   value: number;
   label: string;
+  title?: string;
 }
+
+export type LeaderboardTitle = 'The Brine King' | 'The Golden Garnish' | 'The Urban Legend';

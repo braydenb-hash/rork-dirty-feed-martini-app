@@ -2,12 +2,43 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { MartiniLog, Badge, Comment, LeaderboardEntry } from '@/types';
-import { MOCK_FEED, MY_LOGS, CURRENT_USER, ALL_BADGES } from '@/mocks/data';
+import { MartiniLog, Badge, Comment, LeaderboardEntry, LeaderboardTitle } from '@/types';
+import { MOCK_FEED, MY_LOGS, CURRENT_USER, ALL_BADGES, MOCK_USER_STREAKS } from '@/mocks/data';
 
 const LOGS_KEY = 'dirty_feed_logs';
 const MY_LOGS_KEY = 'dirty_feed_my_logs';
 const FEED_KEY = 'dirty_feed_feed';
+const STREAK_KEY = 'dirty_feed_streak';
+
+interface StreakData {
+  count: number;
+  lastLogDate: string | null;
+}
+
+function computeStreak(currentStreak: StreakData, newLogTimestamp: string): StreakData {
+  if (!currentStreak.lastLogDate) {
+    return { count: 1, lastLogDate: newLogTimestamp };
+  }
+
+  const lastLog = new Date(currentStreak.lastLogDate);
+  const newLog = new Date(newLogTimestamp);
+  const diffMs = newLog.getTime() - lastLog.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffHours >= 24 && diffHours <= 48) {
+    return { count: currentStreak.count + 1, lastLogDate: newLogTimestamp };
+  } else if (diffHours < 24) {
+    return { count: currentStreak.count, lastLogDate: newLogTimestamp };
+  } else {
+    return { count: 1, lastLogDate: newLogTimestamp };
+  }
+}
+
+const TITLE_MAP: Record<string, LeaderboardTitle> = {
+  most_poured: 'The Brine King',
+  city_connoisseur: 'The Golden Garnish',
+  bar_hopper: 'The Urban Legend',
+};
 
 export const [MartiniProvider, useMartini] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -15,6 +46,10 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   const [myLogs, setMyLogs] = useState<MartiniLog[]>(MY_LOGS);
   const [user, setUser] = useState(CURRENT_USER);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState<Badge[]>([]);
+  const [streakData, setStreakData] = useState<StreakData>({
+    count: CURRENT_USER.streakCount,
+    lastLogDate: CURRENT_USER.lastLogDate ?? null,
+  });
   const previousBadgeIds = useRef<Set<string>>(new Set());
 
   const myLogsQuery = useQuery({
@@ -38,6 +73,23 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
       return MOCK_FEED;
     },
   });
+
+  const streakQuery = useQuery({
+    queryKey: ['streak'],
+    queryFn: async () => {
+      const stored = await AsyncStorage.getItem(STREAK_KEY);
+      if (stored) {
+        return JSON.parse(stored) as StreakData;
+      }
+      return { count: CURRENT_USER.streakCount, lastLogDate: CURRENT_USER.lastLogDate ?? null };
+    },
+  });
+
+  useEffect(() => {
+    if (streakQuery.data) {
+      setStreakData(streakQuery.data);
+    }
+  }, [streakQuery.data]);
 
   useEffect(() => {
     if (feedQuery.data) {
@@ -76,6 +128,16 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feedLogs'] });
+    },
+  });
+
+  const saveStreakMutation = useMutation({
+    mutationFn: async (data: StreakData) => {
+      await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(data));
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streak'] });
     },
   });
 
@@ -173,9 +235,15 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     setFeedLogs(updatedFeed);
     saveMutation.mutate(updatedMyLogs);
     saveFeedMutation.mutate(updatedFeed);
+
+    const newStreak = computeStreak(streakData, log.timestamp);
+    setStreakData(newStreak);
+    saveStreakMutation.mutate(newStreak);
+    console.log('Streak updated:', newStreak.count);
+
     console.log('Added martini log:', log.id);
     return computeBadges(updatedMyLogs).filter(b => b.earned && !previousBadgeIds.current.has(b.id));
-  }, [myLogs, feedLogs, saveMutation, saveFeedMutation, computeBadges]);
+  }, [myLogs, feedLogs, saveMutation, saveFeedMutation, computeBadges, streakData, saveStreakMutation]);
 
   const deleteLog = useCallback((logId: string) => {
     const updatedMyLogs = myLogs.filter(l => l.id !== logId);
@@ -223,8 +291,26 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   const refreshFeed = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['feedLogs'] });
     await queryClient.invalidateQueries({ queryKey: ['myLogs'] });
+    await queryClient.invalidateQueries({ queryKey: ['streak'] });
     console.log('Feed refreshed');
   }, [queryClient]);
+
+  const userStreaks = useMemo(() => {
+    const streaks: Record<string, number> = { ...MOCK_USER_STREAKS };
+    streaks[user.id] = streakData.count;
+    return streaks;
+  }, [streakData.count, user.id]);
+
+  const activeBars = useMemo(() => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const barActivity: Record<string, number> = {};
+    feedLogs.forEach(log => {
+      if (log.timestamp >= threeHoursAgo) {
+        barActivity[log.barId] = (barActivity[log.barId] || 0) + 1;
+      }
+    });
+    return barActivity;
+  }, [feedLogs]);
 
   const leaderboards = useMemo(() => {
     const allLogs = feedLogs;
@@ -253,7 +339,11 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
         label: 'martinis',
       }))
       .sort((a, b) => b.value - a.value)
-      .map((entry, i) => ({ ...entry, rank: i + 1 }));
+      .map((entry, i) => ({
+        ...entry,
+        rank: i + 1,
+        title: i === 0 ? TITLE_MAP['most_poured'] : undefined,
+      }));
 
     const connoisseur: LeaderboardEntry[] = Array.from(userMap.entries())
       .map(([userId, data]) => ({
@@ -265,7 +355,11 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
         label: 'avg olives',
       }))
       .sort((a, b) => b.value - a.value)
-      .map((entry, i) => ({ ...entry, rank: i + 1 }));
+      .map((entry, i) => ({
+        ...entry,
+        rank: i + 1,
+        title: i === 0 ? TITLE_MAP['city_connoisseur'] : undefined,
+      }));
 
     const barHopper: LeaderboardEntry[] = Array.from(userMap.entries())
       .map(([userId, data]) => ({
@@ -277,7 +371,11 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
         label: 'bars',
       }))
       .sort((a, b) => b.value - a.value)
-      .map((entry, i) => ({ ...entry, rank: i + 1 }));
+      .map((entry, i) => ({
+        ...entry,
+        rank: i + 1,
+        title: i === 0 ? TITLE_MAP['bar_hopper'] : undefined,
+      }));
 
     return {
       most_poured: mostPoured,
@@ -286,10 +384,23 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     };
   }, [feedLogs]);
 
+  const userTitles = useMemo(() => {
+    const titles: Record<string, LeaderboardTitle[]> = {};
+    const categories: Array<'most_poured' | 'city_connoisseur' | 'bar_hopper'> = ['most_poured', 'city_connoisseur', 'bar_hopper'];
+    categories.forEach(cat => {
+      const leader = leaderboards[cat][0];
+      if (leader) {
+        if (!titles[leader.userId]) titles[leader.userId] = [];
+        titles[leader.userId].push(TITLE_MAP[cat]);
+      }
+    });
+    return titles;
+  }, [leaderboards]);
+
   return {
     feedLogs,
     myLogs,
-    user: { ...user, badges },
+    user: { ...user, badges, streakCount: streakData.count, lastLogDate: streakData.lastLogDate ?? undefined },
     addLog,
     deleteLog,
     toggleLike,
@@ -300,5 +411,8 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     clearNewBadges,
     refreshFeed,
     leaderboards,
+    userStreaks,
+    activeBars,
+    userTitles,
   };
 });

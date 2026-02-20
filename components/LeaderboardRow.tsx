@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
+import { Crown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { LeaderboardEntry } from '@/types';
 
@@ -27,8 +28,18 @@ function LeaderboardRowInner({ entry, isCurrentUser = false, onPress }: Leaderbo
       </View>
       <Image source={{ uri: entry.userAvatar }} style={[styles.avatar, isTop3 && styles.avatarTop3]} />
       <View style={styles.info}>
-        <Text style={[styles.name, isCurrentUser && styles.nameHighlight]}>{entry.userName}</Text>
-        {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
+        <View style={styles.nameColumn}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, isCurrentUser && styles.nameHighlight]}>{entry.userName}</Text>
+            {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
+          </View>
+          {entry.title && (
+            <View style={styles.titleBadge}>
+              <Crown size={10} color="#FFD700" />
+              <Text style={styles.titleText}>{entry.title}</Text>
+            </View>
+          )}
+        </View>
       </View>
       <View style={styles.valueContainer}>
         <Text style={[styles.value, isTop3 && styles.valueTop3]}>
@@ -82,9 +93,31 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  },
+  nameColumn: {
+    flex: 1,
+    gap: 3,
+  },
+  nameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 8,
+  },
+  titleBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  titleText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '700' as const,
+    letterSpacing: 0.3,
   },
   name: {
     color: Colors.white,

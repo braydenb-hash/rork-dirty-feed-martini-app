@@ -97,6 +97,16 @@ export const CURRENT_USER: User = {
   barsVisited: 8,
   badges: ALL_BADGES,
   joinedDate: '2024-11-01',
+  streakCount: 5,
+  lastLogDate: '2025-02-17T19:45:00Z',
+};
+
+export const MOCK_USER_STREAKS: Record<string, number> = {
+  'user_me': 5,
+  'user_2': 12,
+  'user_3': 2,
+  'user_4': 7,
+  'user_5': 21,
 };
 
 export const MOCK_BARS: Bar[] = [

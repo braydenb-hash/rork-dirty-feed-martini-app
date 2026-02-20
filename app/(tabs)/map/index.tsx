@@ -13,7 +13,8 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { MapPin, Star, Wine, ChevronRight, Navigation, X, Search } from 'lucide-react-native';
+import { MapPin, Star, Wine, ChevronRight, Navigation, X, Search, Zap } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { MOCK_BARS } from '@/mocks/data';
 import { useMartini } from '@/contexts/MartiniContext';
@@ -39,7 +40,7 @@ const NYC_REGION = {
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { feedLogs } = useMartini();
+  const { feedLogs, activeBars } = useMartini();
   const mapRef = useRef<any>(null);
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,8 +100,20 @@ export default function MapScreen() {
     ]).start(() => setSelectedBar(null));
   }, [slideAnim, fadeAnim]);
 
+  const isBarActive = useCallback((barId: string): boolean => {
+    return (activeBars[barId] ?? 0) > 0;
+  }, [activeBars]);
+
+  const getActiveCount = useCallback((barId: string): number => {
+    return activeBars[barId] ?? 0;
+  }, [activeBars]);
+
   const handleMarkerPress = useCallback((bar: Bar) => {
     console.log('Marker pressed:', bar.name);
+    if (isBarActive(bar.id)) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      console.log('Live bar tapped:', bar.name);
+    }
     showCard(bar);
     mapRef.current?.animateToRegion(
       {
@@ -111,7 +124,7 @@ export default function MapScreen() {
       },
       400
     );
-  }, [showCard]);
+  }, [showCard, isBarActive]);
 
   const handleBarDetail = useCallback((barId: string) => {
     console.log('Navigating to bar:', barId);
@@ -150,14 +163,21 @@ export default function MapScreen() {
             {filteredBars.map(bar => (
               <Pressable
                 key={bar.id}
-                style={styles.webBarCard}
+                style={[styles.webBarCard, isBarActive(bar.id) && styles.webBarCardActive]}
                 onPress={() => handleBarDetail(bar.id)}
               >
-                <Image
-                  source={{ uri: bar.photo }}
-                  style={styles.webBarImage}
-                  contentFit="cover"
-                />
+                <View>
+                  <Image
+                    source={{ uri: bar.photo }}
+                    style={styles.webBarImage}
+                    contentFit="cover"
+                  />
+                  {isBarActive(bar.id) && (
+                    <View style={styles.webActiveDot}>
+                      <Zap size={10} color="#FFD700" fill="#FFD700" />
+                    </View>
+                  )}
+                </View>
                 <View style={styles.webBarInfo}>
                   <Text style={styles.cardName} numberOfLines={1}>{bar.name}</Text>
                   <View style={styles.cardLocationRow}>
@@ -167,8 +187,17 @@ export default function MapScreen() {
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <Star size={12} color={Colors.gold} fill={Colors.gold} />
-                    <Text style={styles.webBarRating}>{bar.communityRating.toFixed(1)}</Text>
+                    {isBarActive(bar.id) ? (
+                      <>
+                        <Zap size={12} color="#FFD700" fill="#FFD700" />
+                        <Text style={styles.webNowPouring}>Now Pouring</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Star size={12} color={Colors.gold} fill={Colors.gold} />
+                        <Text style={styles.webBarRating}>{bar.communityRating.toFixed(1)}</Text>
+                      </>
+                    )}
                     <Text style={styles.cardStatLabel}>{bar.topDrink}</Text>
                   </View>
                 </View>
@@ -201,16 +230,19 @@ export default function MapScreen() {
         showsMyLocationButton={false}
         showsPointsOfInterest={false}
       >
-        {filteredBars.map(bar => (
-          <NativeMarker
-            key={bar.id}
-            coordinate={{ latitude: bar.latitude, longitude: bar.longitude }}
-            title={bar.name}
-            description={`${bar.communityRating.toFixed(1)} ⭐ · ${bar.topDrink}`}
-            onPress={() => handleMarkerPress(bar)}
-            pinColor={bar.communityRating >= 4.5 ? Colors.gold : bar.communityRating >= 4.0 ? Colors.goldLight : Colors.goldMuted}
-          />
-        ))}
+        {filteredBars.map(bar => {
+          const active = isBarActive(bar.id);
+          return (
+            <NativeMarker
+              key={bar.id}
+              coordinate={{ latitude: bar.latitude, longitude: bar.longitude }}
+              title={bar.name}
+              description={active ? `🔥 Now Pouring · ${getActiveCount(bar.id)} recent` : `${bar.communityRating.toFixed(1)} ⭐ · ${bar.topDrink}`}
+              onPress={() => handleMarkerPress(bar)}
+              pinColor={active ? '#FFD700' : bar.communityRating >= 4.5 ? Colors.gold : bar.communityRating >= 4.0 ? Colors.goldLight : Colors.goldMuted}
+            />
+          );
+        })}
       </NativeMapView>
 
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
@@ -276,6 +308,14 @@ export default function MapScreen() {
                 <OliveRating rating={Math.round(selectedBar.communityRating)} size={14} />
               </View>
             </View>
+
+            {isBarActive(selectedBar.id) && (
+              <View style={styles.nowPouringBanner}>
+                <Zap size={14} color="#FFD700" fill="#FFD700" />
+                <Text style={styles.nowPouringText}>Now Pouring</Text>
+                <Text style={styles.nowPouringCount}>{getActiveCount(selectedBar.id)} logged recently</Text>
+              </View>
+            )}
 
             <View style={styles.cardStats}>
               <View style={styles.cardStat}>
@@ -515,6 +555,47 @@ const styles = StyleSheet.create({
     color: Colors.gold,
     fontSize: 13,
     fontWeight: '600' as const,
+  },
+  nowPouringBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  nowPouringText: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+  nowPouringCount: {
+    color: Colors.goldMuted,
+    fontSize: 12,
+    marginLeft: 'auto' as const,
+  },
+  webBarCardActive: {
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  webActiveDot: {
+    position: 'absolute' as const,
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  webNowPouring: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '700' as const,
   },
   webEmpty: {
     paddingVertical: 40,
