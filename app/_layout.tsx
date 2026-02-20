@@ -21,7 +21,7 @@ function RootLayoutNav() {
     console.log('[RootLayout] hasOnboarded:', hasOnboarded, 'segments:', segments);
     if (hasOnboarded === null) return;
 
-    const inOnboarding = segments[0] === 'onboarding';
+    const inOnboarding = (segments[0] as string) === 'onboarding';
 
     if (!hasOnboarded && !inOnboarding) {
       console.log('[RootLayout] Redirecting to onboarding');
