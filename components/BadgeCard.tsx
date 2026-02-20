@@ -9,6 +9,11 @@ interface BadgeCardProps {
 }
 
 function BadgeCardInner({ badge, compact = false }: BadgeCardProps) {
+  const progress = badge.progress ?? 0;
+  const progressMax = badge.progressMax ?? 1;
+  const progressPct = progressMax > 0 ? Math.min(progress / progressMax, 1) : 0;
+  const showProgress = !badge.earned && !compact && progressMax > 0;
+
   return (
     <View style={[
       styles.card,
@@ -25,6 +30,14 @@ function BadgeCardInner({ badge, compact = false }: BadgeCardProps) {
         <Text style={[styles.description, !badge.earned && styles.descLocked]} numberOfLines={2}>
           {badge.earned ? badge.description : badge.requirement}
         </Text>
+      )}
+      {showProgress && (
+        <View style={styles.progressWrap}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
+          </View>
+          <Text style={styles.progressText}>{progress}/{progressMax}</Text>
+        </View>
       )}
     </View>
   );
@@ -48,7 +61,7 @@ const styles = StyleSheet.create({
   },
   cardLocked: {
     borderColor: Colors.darkBorder,
-    opacity: 0.5,
+    opacity: 0.7,
   },
   icon: {
     fontSize: 32,
@@ -59,7 +72,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   iconLocked: {
-    opacity: 0.4,
+    opacity: 0.5,
   },
   name: {
     color: Colors.gold,
@@ -82,5 +95,28 @@ const styles = StyleSheet.create({
   },
   descLocked: {
     color: Colors.gray,
+  },
+  progressWrap: {
+    width: '100%',
+    marginTop: 8,
+    alignItems: 'center',
+    gap: 3,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.darkBorder,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: Colors.goldMuted,
+  },
+  progressText: {
+    color: Colors.gray,
+    fontSize: 9,
+    fontWeight: '600' as const,
   },
 });

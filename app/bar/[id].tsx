@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapPin, Star, X, Users, Wine } from 'lucide-react-native';
+import { MapPin, Star, X, Users, Wine, PenLine } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { MOCK_BARS } from '@/mocks/data';
 import { useMartini } from '@/contexts/MartiniContext';
@@ -30,6 +31,14 @@ export default function BarDetailScreen() {
       </View>
     );
   }
+
+  const handleLogHere = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.back();
+    setTimeout(() => {
+      router.push({ pathname: '/(tabs)/log', params: { barName: bar.name, barCity: bar.city, barId: bar.id } } as never);
+    }, 300);
+  };
 
   return (
     <View style={styles.container}>
@@ -70,6 +79,11 @@ export default function BarDetailScreen() {
               <Text style={styles.statLabel}>Top Drink</Text>
             </View>
           </View>
+
+          <Pressable style={styles.logHereButton} onPress={handleLogHere}>
+            <PenLine size={18} color={Colors.dark} />
+            <Text style={styles.logHereText}>Log a Martini Here</Text>
+          </Pressable>
 
           {barLogs.length > 0 && (
             <View style={styles.reviewsSection}>
@@ -155,7 +169,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: Colors.darkBorder,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   statItem: {
     flex: 1,
@@ -175,6 +189,21 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     backgroundColor: Colors.darkBorder,
+  },
+  logHereButton: {
+    backgroundColor: Colors.gold,
+    borderRadius: 14,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 24,
+  },
+  logHereText: {
+    color: Colors.dark,
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   reviewsSection: {
     marginTop: 4,

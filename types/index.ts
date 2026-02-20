@@ -26,6 +26,7 @@ export interface MartiniLog {
   timestamp: string;
   likes: number;
   liked: boolean;
+  comments?: Comment[];
 }
 
 export interface Bar {
@@ -49,6 +50,17 @@ export interface Badge {
   earned: boolean;
   earnedDate?: string;
   requirement: string;
+  progress?: number;
+  progressMax?: number;
+}
+
+export interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  text: string;
+  timestamp: string;
 }
 
 export type LeaderboardType = 'most_poured' | 'city_connoisseur' | 'bar_hopper';

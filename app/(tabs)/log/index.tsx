@@ -6,7 +6,7 @@ import {
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Camera, Send, ChevronDown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useMartini } from '@/contexts/MartiniContext';
@@ -18,8 +18,9 @@ import { MartiniLog, Badge } from '@/types';
 export default function LogScreen() {
   const { addLog, user } = useMartini();
   const router = useRouter();
-  const [barName, setBarName] = useState('');
-  const [city, setCity] = useState('');
+  const params = useLocalSearchParams<{ barName?: string; barCity?: string; barId?: string }>();
+  const [barName, setBarName] = useState(params.barName ?? '');
+  const [city, setCity] = useState(params.barCity ?? '');
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState('');

@@ -5,11 +5,7 @@ import { Flame, Star, MapPinned } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
-import {
-  MOCK_LEADERBOARD_MOST_POURED,
-  MOCK_LEADERBOARD_CONNOISSEUR,
-  MOCK_LEADERBOARD_BAR_HOPPER,
-} from '@/mocks/data';
+import { useMartini } from '@/contexts/MartiniContext';
 import LeaderboardRow from '@/components/LeaderboardRow';
 import { LeaderboardEntry, LeaderboardType } from '@/types';
 
@@ -19,17 +15,12 @@ const TABS: { key: LeaderboardType; label: string; icon: React.ReactNode }[] = [
   { key: 'bar_hopper', label: 'Bar Hopper', icon: <MapPinned size={16} color={Colors.gold} /> },
 ];
 
-const DATA_MAP: Record<LeaderboardType, LeaderboardEntry[]> = {
-  most_poured: MOCK_LEADERBOARD_MOST_POURED,
-  city_connoisseur: MOCK_LEADERBOARD_CONNOISSEUR,
-  bar_hopper: MOCK_LEADERBOARD_BAR_HOPPER,
-};
-
 export default function LeaderboardScreen() {
   const [activeTab, setActiveTab] = useState<LeaderboardType>('most_poured');
   const [refreshing, setRefreshing] = useState(false);
   const indicatorAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
+  const { leaderboards, refreshFeed } = useMartini();
 
   const switchTab = useCallback((tab: LeaderboardType, index: number) => {
     Haptics.selectionAsync();
@@ -44,15 +35,15 @@ export default function LeaderboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
+    await refreshFeed();
     setRefreshing(false);
-  }, []);
+  }, [refreshFeed]);
 
   const handleUserPress = useCallback((userId: string) => {
     router.push(`/user/${userId}` as never);
   }, [router]);
 
-  const data = DATA_MAP[activeTab];
+  const data = leaderboards[activeTab];
 
   const renderItem = useCallback(({ item }: { item: LeaderboardEntry }) => (
     <LeaderboardRow entry={item} isCurrentUser={item.userId === 'user_me'} onPress={handleUserPress} />
@@ -77,34 +68,40 @@ export default function LeaderboardScreen() {
         ))}
       </View>
 
-      <View style={styles.podium}>
-        {data.slice(0, 3).map((entry, index) => (
-          <Pressable
-            key={entry.userId}
-            style={[
-              styles.podiumItem,
-              index === 0 && styles.podiumFirst,
-              index === 1 && styles.podiumSecond,
-              index === 2 && styles.podiumThird,
-            ]}
-            onPress={() => handleUserPress(entry.userId)}
-          >
-            <Text style={styles.podiumRank}>
-              {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-            </Text>
-            <View style={[styles.podiumAvatarWrap, index === 0 && styles.podiumAvatarWrapFirst]}>
-              <Image
-                source={{ uri: entry.userAvatar }}
-                style={[styles.podiumAvatar, index === 0 && styles.podiumAvatarFirst]}
-              />
-            </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{entry.userName.split(' ')[0]}</Text>
-            <Text style={styles.podiumValue}>
-              {Number.isInteger(entry.value) ? entry.value : entry.value.toFixed(1)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      {data.length >= 3 ? (
+        <View style={styles.podium}>
+          {data.slice(0, 3).map((entry, index) => (
+            <Pressable
+              key={entry.userId}
+              style={[
+                styles.podiumItem,
+                index === 0 && styles.podiumFirst,
+                index === 1 && styles.podiumSecond,
+                index === 2 && styles.podiumThird,
+              ]}
+              onPress={() => handleUserPress(entry.userId)}
+            >
+              <Text style={styles.podiumRank}>
+                {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+              </Text>
+              <View style={[styles.podiumAvatarWrap, index === 0 && styles.podiumAvatarWrapFirst]}>
+                <Image
+                  source={{ uri: entry.userAvatar }}
+                  style={[styles.podiumAvatar, index === 0 && styles.podiumAvatarFirst]}
+                />
+              </View>
+              <Text style={styles.podiumName} numberOfLines={1}>{entry.userName.split(' ')[0]}</Text>
+              <Text style={styles.podiumValue}>
+                {Number.isInteger(entry.value) ? entry.value : entry.value.toFixed(1)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyPodium}>
+          <Text style={styles.emptyPodiumText}>Log more martinis to fill the podium!</Text>
+        </View>
+      )}
 
       <FlatList
         data={data}
@@ -120,6 +117,13 @@ export default function LeaderboardScreen() {
             colors={[Colors.gold]}
             progressBackgroundColor={Colors.darkCard}
           />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyList}>
+            <Text style={styles.emptyEmoji}>🍸</Text>
+            <Text style={styles.emptyText}>No rankings yet</Text>
+            <Text style={styles.emptySub}>Start logging to climb the board!</Text>
+          </View>
         }
       />
     </View>
@@ -223,5 +227,31 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 20,
+  },
+  emptyPodium: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  emptyPodiumText: {
+    color: Colors.gray,
+    fontSize: 14,
+  },
+  emptyList: {
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  emptyEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  emptySub: {
+    color: Colors.gray,
+    fontSize: 13,
+    marginTop: 4,
   },
 });

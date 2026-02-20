@@ -1,9 +1,10 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, Pressable } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, FlatList, Pressable, Alert, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Wine, MapPin, Star, Calendar } from 'lucide-react-native';
+import { Wine, MapPin, Star, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useMartini } from '@/contexts/MartiniContext';
 import BadgeCard from '@/components/BadgeCard';
@@ -11,7 +12,7 @@ import OliveRating from '@/components/OliveRating';
 import { Badge, MartiniLog } from '@/types';
 
 export default function ProfileScreen() {
-  const { user, badges, myLogs } = useMartini();
+  const { user, badges, myLogs, deleteLog } = useMartini();
   const insets = useSafeAreaInsets();
 
   const earnedBadges = badges.filter(b => b.earned);
@@ -22,6 +23,25 @@ export default function ProfileScreen() {
   ), []);
 
   const badgeKeyExtractor = useCallback((item: Badge) => item.id, []);
+
+  const handleDelete = useCallback((logId: string, barName: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Delete Log',
+      `Remove your log at ${barName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteLog(logId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ]
+    );
+  }, [deleteLog]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -91,9 +111,17 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Logs</Text>
-          {myLogs.map(log => (
-            <LogHistoryItem key={log.id} log={log} />
-          ))}
+          {myLogs.length === 0 ? (
+            <View style={styles.emptyLogs}>
+              <Text style={styles.emptyEmoji}>🍸</Text>
+              <Text style={styles.emptyText}>No logs yet</Text>
+              <Text style={styles.emptySub}>Log your first martini!</Text>
+            </View>
+          ) : (
+            myLogs.map(log => (
+              <LogHistoryItem key={log.id} log={log} onDelete={handleDelete} />
+            ))
+          )}
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -102,7 +130,7 @@ export default function ProfileScreen() {
   );
 }
 
-function LogHistoryItem({ log }: { log: MartiniLog }) {
+function LogHistoryItem({ log, onDelete }: { log: MartiniLog; onDelete: (id: string, barName: string) => void }) {
   return (
     <View style={styles.logItem}>
       <Image source={{ uri: log.photo }} style={styles.logPhoto} contentFit="cover" />
@@ -116,6 +144,13 @@ function LogHistoryItem({ log }: { log: MartiniLog }) {
           </Text>
         </View>
       </View>
+      <Pressable
+        style={styles.deleteBtn}
+        onPress={() => onDelete(log.id, log.barName)}
+        hitSlop={10}
+      >
+        <Trash2 size={16} color={Colors.danger} />
+      </Pressable>
     </View>
   );
 }
@@ -246,6 +281,32 @@ const styles = StyleSheet.create({
   logDate: {
     color: Colors.gray,
     fontSize: 12,
+  },
+  deleteBtn: {
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  emptyLogs: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: Colors.darkCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.darkBorder,
+  },
+  emptyEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  emptySub: {
+    color: Colors.gray,
+    fontSize: 13,
+    marginTop: 2,
   },
   bottomSpacer: {
     height: 20,
