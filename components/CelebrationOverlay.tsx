@@ -23,7 +23,7 @@ function CelebrationOverlay({ visible, onDismiss, newBadges = [] }: CelebrationO
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   const confettiAnims = useMemo(() =>
-    Array.from({ length: 18 }, () => ({
+    Array.from({ length: 8 }, () => ({
       x: new Animated.Value(SCREEN_WIDTH / 2),
       y: new Animated.Value(SCREEN_HEIGHT / 2),
       opacity: new Animated.Value(1),

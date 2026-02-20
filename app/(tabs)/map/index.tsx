@@ -8,9 +8,9 @@ import {
   Platform,
   ScrollView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MapPin, Star, Wine, ChevronRight, Navigation, X, Search } from 'lucide-react-native';
@@ -19,6 +19,15 @@ import { MOCK_BARS } from '@/mocks/data';
 import { useMartini } from '@/contexts/MartiniContext';
 import OliveRating from '@/components/OliveRating';
 import { Bar } from '@/types';
+
+let MapView: React.ComponentType<any> | null = null;
+let Marker: React.ComponentType<any> | null = null;
+
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default;
+  Marker = Maps.Marker;
+}
 
 const NYC_REGION = {
   latitude: 40.7350,
@@ -31,7 +40,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { feedLogs } = useMartini();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const slideAnim = useRef(new Animated.Value(200)).current;
@@ -114,7 +123,7 @@ export default function MapScreen() {
     hideCard();
   }, [hideCard]);
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || !MapView || !Marker) {
     return (
       <View style={styles.container}>
         <View style={[styles.webFallback, { paddingTop: insets.top }]}>
@@ -178,9 +187,12 @@ export default function MapScreen() {
     );
   }
 
+  const NativeMapView = MapView;
+  const NativeMarker = Marker;
+
   return (
     <View style={styles.container}>
-      <MapView
+      <NativeMapView
         ref={mapRef}
         style={styles.map}
         initialRegion={NYC_REGION}
@@ -190,7 +202,7 @@ export default function MapScreen() {
         showsPointsOfInterest={false}
       >
         {filteredBars.map(bar => (
-          <Marker
+          <NativeMarker
             key={bar.id}
             coordinate={{ latitude: bar.latitude, longitude: bar.longitude }}
             title={bar.name}
@@ -199,7 +211,7 @@ export default function MapScreen() {
             pinColor={bar.communityRating >= 4.5 ? Colors.gold : bar.communityRating >= 4.0 ? Colors.goldLight : Colors.goldMuted}
           />
         ))}
-      </MapView>
+      </NativeMapView>
 
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.searchContainer}>
