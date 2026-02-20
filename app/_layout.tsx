@@ -5,6 +5,17 @@ import React, { useEffect } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
+import {
+  CormorantGaramond_400Regular,
+  CormorantGaramond_400Regular_Italic,
+  CormorantGaramond_600SemiBold_Italic,
+} from "@expo-google-fonts/cormorant-garamond";
+import {
+  IBMPlexMono_300Light,
+  IBMPlexMono_400Regular,
+  IBMPlexMono_600SemiBold,
+} from "@expo-google-fonts/ibm-plex-mono";
 import { MartiniProvider } from "@/contexts/MartiniContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
@@ -67,13 +78,23 @@ function RootLayoutNav() {
 function AppContent() {
   const { hasOnboarded, isLoading, theme } = useTheme();
 
+  const [fontsLoaded] = useFonts({
+    CormorantGaramond_400Regular,
+    CormorantGaramond_400Regular_Italic,
+    CormorantGaramond_600SemiBold_Italic,
+    IBMPlexMono_300Light,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_600SemiBold,
+  });
+
   useEffect(() => {
-    if (!isLoading && hasOnboarded !== null) {
+    if (!isLoading && hasOnboarded !== null && fontsLoaded) {
+      console.log('[RootLayout] Fonts loaded, hiding splash screen');
       SplashScreen.hideAsync();
     }
-  }, [isLoading, hasOnboarded]);
+  }, [isLoading, hasOnboarded, fontsLoaded]);
 
-  if (isLoading || hasOnboarded === null) {
+  if (isLoading || hasOnboarded === null || !fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: '#020202' }} />;
   }
 

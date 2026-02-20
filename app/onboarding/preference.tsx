@@ -11,7 +11,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { ThemePreference, dirtyTheme, cleanTheme, Fonts } from '@/constants/themes';
 
 export default function PreferenceScreen() {
-  const { completeOnboarding } = useTheme();
+  const { setTheme } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -46,10 +46,10 @@ export default function PreferenceScreen() {
     });
 
     setTimeout(() => {
-      completeOnboarding(pref);
-      router.replace('/(tabs)' as never);
+      setTheme(pref);
+      router.push({ pathname: '/onboarding/confirm', params: { preference: pref } } as never);
     }, 2400);
-  }, [chosen, floodScale, contentFade, resultFade, completeOnboarding, router]);
+  }, [chosen, floodScale, contentFade, resultFade, setTheme, router]);
 
   const floodColor = chosen === 'dirty' ? dirtyTheme.accent : cleanTheme.accent;
   const floodCenterX = chosen === 'dirty' ? width * 0.25 : width * 0.75;

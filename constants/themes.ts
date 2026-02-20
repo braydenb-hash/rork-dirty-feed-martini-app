@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 export type ThemePreference = 'dirty' | 'clean';
 
 export interface AppTheme {
@@ -23,16 +21,12 @@ export interface AppTheme {
 }
 
 export const Fonts = {
-  prestige: Platform.select({
-    ios: 'Georgia',
-    android: 'serif',
-    default: 'Georgia, Times New Roman, serif',
-  }) as string,
-  data: Platform.select({
-    ios: 'Menlo',
-    android: 'monospace',
-    default: 'Menlo, Courier New, monospace',
-  }) as string,
+  prestige: 'CormorantGaramond_400Regular_Italic',
+  prestigeBold: 'CormorantGaramond_600SemiBold_Italic',
+  prestigeRegular: 'CormorantGaramond_400Regular',
+  data: 'IBMPlexMono_400Regular',
+  dataLight: 'IBMPlexMono_300Light',
+  dataBold: 'IBMPlexMono_600SemiBold',
 };
 
 export const dirtyTheme: AppTheme = {

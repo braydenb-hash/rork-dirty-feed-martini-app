@@ -11,6 +11,7 @@ export default function OnboardingLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="preference" />
+      <Stack.Screen name="confirm" />
     </Stack>
   );
 }
