@@ -5,6 +5,7 @@ import { Heart, MapPin, Clock, MessageCircle, Send, Share2, Flame } from 'lucide
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { MartiniLog, Comment } from '@/types';
+import { Sunrise } from 'lucide-react-native';
 import OliveRating from './OliveRating';
 
 interface FeedCardProps {
@@ -50,7 +51,7 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
   }, [streakCount, flamePulse]);
 
   const handleLike = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 1.3, duration: 100, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
@@ -123,6 +124,13 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
         </View>
 
         <Text style={styles.notes} numberOfLines={3}>{log.notes}</Text>
+
+        {log.isGoldenHourLog && (
+          <View style={styles.goldenHourChip}>
+            <Sunrise size={11} color="#FFD700" />
+            <Text style={styles.goldenHourChipText}>Golden Hour · 2x</Text>
+          </View>
+        )}
 
         <View style={styles.footer}>
           <View style={styles.footerActions}>
@@ -331,6 +339,22 @@ const styles = StyleSheet.create({
   cityText: {
     color: Colors.gray,
     fontSize: 12,
+  },
+  goldenHourChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    alignSelf: 'flex-start' as const,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  goldenHourChipText: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: '600' as const,
   },
   commentsSection: {
     marginTop: 12,

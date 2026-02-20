@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapPin, Star, X, Users, Wine, PenLine } from 'lucide-react-native';
+import { MapPin, Star, X, Users, Wine, PenLine, Crown, TrendingUp } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { MOCK_BARS } from '@/mocks/data';
@@ -14,10 +14,38 @@ export default function BarDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { feedLogs } = useMartini();
+  const { feedLogs, barMayorships, user } = useMartini();
+  const crownPulse = useRef(new Animated.Value(1)).current;
 
   const bar = MOCK_BARS.find(b => b.id === id);
   const barLogs = feedLogs.filter(l => l.barId === id);
+  const mayorship = id ? barMayorships[id] : undefined;
+
+  const currentUserLogCount = useMemo(() => {
+    return barLogs.filter(l => l.userId === user.id).length;
+  }, [barLogs, user.id]);
+
+  const logsToOvertake = useMemo(() => {
+    if (!mayorship || mayorship.userId === user.id) return 0;
+    return Math.max(0, mayorship.logCount - currentUserLogCount + 1);
+  }, [mayorship, currentUserLogCount, user.id]);
+
+  const progressToMayor = useMemo(() => {
+    if (!mayorship || mayorship.userId === user.id) return 1;
+    if (mayorship.logCount === 0) return 0;
+    return Math.min(currentUserLogCount / mayorship.logCount, 0.95);
+  }, [mayorship, currentUserLogCount, user.id]);
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(crownPulse, { toValue: 1.15, duration: 1000, useNativeDriver: true }),
+        Animated.timing(crownPulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [crownPulse]);
 
   if (!bar) {
     return (
@@ -40,6 +68,8 @@ export default function BarDetailScreen() {
     }, 300);
   };
 
+  const isCurrentUserMayor = mayorship?.userId === user.id;
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -59,6 +89,51 @@ export default function BarDetailScreen() {
             <MapPin size={14} color={Colors.goldMuted} />
             <Text style={styles.address}>{bar.address}, {bar.city}</Text>
           </View>
+
+          {mayorship && (
+            <View style={[styles.mayorCard, isCurrentUserMayor && styles.mayorCardOwned]}>
+              <View style={styles.mayorHeader}>
+                <Animated.View style={{ transform: [{ scale: crownPulse }] }}>
+                  <Crown size={20} color="#FFD700" />
+                </Animated.View>
+                <Text style={styles.mayorTitle}>Head Bartender</Text>
+              </View>
+              <View style={styles.mayorUser}>
+                <Image source={{ uri: mayorship.userAvatar }} style={styles.mayorAvatar} />
+                <View style={styles.mayorInfo}>
+                  <Text style={styles.mayorName}>
+                    {mayorship.userName}
+                    {isCurrentUserMayor ? ' (You!)' : ''}
+                  </Text>
+                  <Text style={styles.mayorStat}>
+                    {mayorship.logCount} log{mayorship.logCount !== 1 ? 's' : ''} at this bar
+                  </Text>
+                </View>
+                {isCurrentUserMayor && (
+                  <View style={styles.crownBadge}>
+                    <Text style={styles.crownEmoji}>👑</Text>
+                  </View>
+                )}
+              </View>
+
+              {!isCurrentUserMayor && (
+                <View style={styles.overtakeSection}>
+                  <View style={styles.overtakeHeader}>
+                    <TrendingUp size={14} color={Colors.goldLight} />
+                    <Text style={styles.overtakeText}>
+                      Log {logsToOvertake} more to overtake {mayorship.userName.split(' ')[0]}
+                    </Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${progressToMayor * 100}%` }]} />
+                  </View>
+                  <Text style={styles.progressLabel}>
+                    {currentUserLogCount}/{mayorship.logCount} logs
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.statsCard}>
             <View style={styles.statItem}>
@@ -101,6 +176,11 @@ export default function BarDetailScreen() {
                     </View>
                   </View>
                   <Text style={styles.reviewNotes}>{log.notes}</Text>
+                  {log.isGoldenHourLog && (
+                    <View style={styles.goldenHourTag}>
+                      <Text style={styles.goldenHourTagText}>🌅 Golden Hour</Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -161,6 +241,101 @@ const styles = StyleSheet.create({
   address: {
     color: Colors.gray,
     fontSize: 14,
+  },
+  mayorCard: {
+    backgroundColor: Colors.darkCard,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  mayorCardOwned: {
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+    backgroundColor: 'rgba(255, 215, 0, 0.06)',
+  },
+  mayorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  mayorTitle: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: '800' as const,
+    letterSpacing: 0.3,
+  },
+  mayorUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mayorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  mayorInfo: {
+    flex: 1,
+  },
+  mayorName: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  mayorStat: {
+    color: Colors.goldMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  crownBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crownEmoji: {
+    fontSize: 18,
+  },
+  overtakeSection: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.darkBorder,
+  },
+  overtakeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  overtakeText: {
+    color: Colors.goldLight,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.darkBorder,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: Colors.gold,
+  },
+  progressLabel: {
+    color: Colors.gray,
+    fontSize: 11,
+    textAlign: 'right' as const,
   },
   statsCard: {
     flexDirection: 'row',
@@ -259,6 +434,19 @@ const styles = StyleSheet.create({
     color: Colors.whiteMuted,
     fontSize: 13,
     lineHeight: 19,
+  },
+  goldenHourTag: {
+    marginTop: 8,
+    alignSelf: 'flex-start' as const,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  goldenHourTagText: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: '600' as const,
   },
   bottomSpacer: {
     height: 40,

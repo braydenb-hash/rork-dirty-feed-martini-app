@@ -1,28 +1,75 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, Pressable, Alert, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Wine, MapPin, Star, Trash2, Flame, Crown } from 'lucide-react-native';
+import { Wine, MapPin, Star, Trash2, Flame, Crown, ChevronRight, Lock, Zap } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useMartini } from '@/contexts/MartiniContext';
-import BadgeCard from '@/components/BadgeCard';
 import OliveRating from '@/components/OliveRating';
 import { Badge, MartiniLog } from '@/types';
+
+const TIER_COLORS: Record<string, string> = {
+  bronze: '#CD7F32',
+  silver: '#A8A8A8',
+  gold: '#FFD700',
+};
+
+const TIER_LABELS: Record<string, string> = {
+  bronze: 'Beginner',
+  silver: 'Intermediate',
+  gold: 'Master',
+};
 
 export default function ProfileScreen() {
   const { user, badges, myLogs, deleteLog, userTitles } = useMartini();
   const insets = useSafeAreaInsets();
+  const flamePulse = useRef(new Animated.Value(1)).current;
 
-  const earnedBadges = badges.filter(b => b.earned);
-  const lockedBadges = badges.filter(b => !b.earned);
+  useEffect(() => {
+    if (user.streakCount >= 3) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flamePulse, { toValue: 1.2, duration: 800, useNativeDriver: true }),
+          Animated.timing(flamePulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [user.streakCount, flamePulse]);
 
-  const renderBadge = useCallback(({ item }: { item: Badge }) => (
-    <BadgeCard badge={item} />
-  ), []);
+  const pathData = useMemo(() => {
+    const tiers: Array<{ tier: string; label: string; color: string; badges: Badge[] }> = [];
+    const tierOrder = ['bronze', 'silver', 'gold'];
 
-  const badgeKeyExtractor = useCallback((item: Badge) => item.id, []);
+    tierOrder.forEach(tier => {
+      const tierBadges = badges.filter(b => b.tier === tier);
+      if (tierBadges.length > 0) {
+        tiers.push({
+          tier,
+          label: TIER_LABELS[tier],
+          color: TIER_COLORS[tier],
+          badges: tierBadges,
+        });
+      }
+    });
+
+    const noBadges = badges.filter(b => !b.tier);
+    if (noBadges.length > 0) {
+      tiers.push({
+        tier: 'other',
+        label: 'Special',
+        color: Colors.gold,
+        badges: noBadges,
+      });
+    }
+
+    return tiers;
+  }, [badges]);
+
+  const earnedCount = badges.filter(b => b.earned).length;
 
   const handleDelete = useCallback((logId: string, barName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -43,6 +90,13 @@ export default function ProfileScreen() {
     );
   }, [deleteLog]);
 
+  const isBadgeUnlockable = useCallback((badge: Badge): boolean => {
+    if (badge.earned) return true;
+    if (!badge.prerequisiteId) return true;
+    const prereq = badges.find(b => b.id === badge.prerequisiteId);
+    return prereq?.earned === true;
+  }, [badges]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -53,13 +107,24 @@ export default function ProfileScreen() {
           <Image source={{ uri: user.avatar }} style={styles.avatar} />
           <Text style={styles.name}>{user.name}</Text>
           <Text style={styles.username}>{user.username}</Text>
+
           {user.streakCount > 0 && (
-            <View style={styles.streakRow}>
-              <Flame size={16} color="#FF6B35" fill="#FF6B35" />
-              <Text style={styles.streakValue}>{user.streakCount}</Text>
-              <Text style={styles.streakLabel}>day streak</Text>
+            <View style={styles.streakCard}>
+              <Animated.View style={{ transform: [{ scale: user.streakCount >= 3 ? flamePulse : 1 }] }}>
+                <Flame size={20} color="#FF6B35" fill="#FF6B35" />
+              </Animated.View>
+              <View style={styles.streakInfo}>
+                <Text style={styles.streakValue}>{user.streakCount}</Text>
+                <Text style={styles.streakLabel}>day streak</Text>
+              </View>
+              {user.longestStreak > user.streakCount && (
+                <View style={styles.bestStreak}>
+                  <Text style={styles.bestStreakText}>Best: {user.longestStreak}</Text>
+                </View>
+              )}
             </View>
           )}
+
           {userTitles[user.id] && userTitles[user.id].length > 0 && (
             <View style={styles.titlesRow}>
               {userTitles[user.id].map(title => (
@@ -70,6 +135,7 @@ export default function ProfileScreen() {
               ))}
             </View>
           )}
+
           <Text style={styles.city}>
             <MapPin size={12} color={Colors.gray} /> {user.city}
           </Text>
@@ -97,34 +163,80 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Badges Earned</Text>
-            <Text style={styles.sectionCount}>{earnedBadges.length}/{badges.length}</Text>
+            <Text style={styles.sectionTitle}>Martini Path</Text>
+            <Text style={styles.sectionCount}>{earnedCount}/{badges.length}</Text>
           </View>
-          <FlatList
-            data={earnedBadges}
-            renderItem={renderBadge}
-            keyExtractor={badgeKeyExtractor}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.badgeList}
-            scrollEnabled
-          />
-        </View>
 
-        {lockedBadges.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Locked</Text>
-            <FlatList
-              data={lockedBadges}
-              renderItem={renderBadge}
-              keyExtractor={badgeKeyExtractor}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.badgeList}
-              scrollEnabled
-            />
-          </View>
-        )}
+          {pathData.map(tierGroup => (
+            <View key={tierGroup.tier} style={styles.tierSection}>
+              <View style={styles.tierHeader}>
+                <View style={[styles.tierDot, { backgroundColor: tierGroup.color }]} />
+                <Text style={[styles.tierLabel, { color: tierGroup.color }]}>{tierGroup.label}</Text>
+                <View style={styles.tierLine} />
+              </View>
+
+              <View style={styles.pathGrid}>
+                {tierGroup.badges.map((badge, idx) => {
+                  const unlockable = isBadgeUnlockable(badge);
+                  const prereq = badge.prerequisiteId
+                    ? badges.find(b => b.id === badge.prerequisiteId)
+                    : null;
+
+                  return (
+                    <View key={badge.id} style={styles.pathNodeWrap}>
+                      {idx > 0 && (
+                        <View style={[styles.pathConnector, badge.earned ? styles.pathConnectorActive : {}]} />
+                      )}
+                      <View
+                        style={[
+                          styles.pathNode,
+                          badge.earned && styles.pathNodeEarned,
+                          !badge.earned && !unlockable && styles.pathNodeLocked,
+                          !badge.earned && unlockable && styles.pathNodeAvailable,
+                        ]}
+                      >
+                        <Text style={[styles.pathIcon, !unlockable && !badge.earned && styles.pathIconLocked]}>
+                          {badge.icon}
+                        </Text>
+                        {!badge.earned && !unlockable && (
+                          <View style={styles.lockOverlay}>
+                            <Lock size={12} color={Colors.gray} />
+                          </View>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.pathName,
+                          badge.earned && styles.pathNameEarned,
+                          !badge.earned && !unlockable && styles.pathNameLocked,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {badge.name}
+                      </Text>
+                      {!badge.earned && unlockable && badge.progress != null && badge.progressMax != null && (
+                        <View style={styles.miniProgress}>
+                          <View style={styles.miniProgressTrack}>
+                            <View
+                              style={[
+                                styles.miniProgressFill,
+                                { width: `${Math.min((badge.progress / badge.progressMax) * 100, 100)}%`, backgroundColor: tierGroup.color },
+                              ]}
+                            />
+                          </View>
+                          <Text style={styles.miniProgressText}>{badge.progress}/{badge.progressMax}</Text>
+                        </View>
+                      )}
+                      {!badge.earned && !unlockable && prereq && (
+                        <Text style={styles.prereqText}>Needs: {prereq.name}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Logs</Text>
@@ -156,6 +268,11 @@ function LogHistoryItem({ log, onDelete }: { log: MartiniLog; onDelete: (id: str
         <OliveRating rating={log.rating} size={12} />
         <View style={styles.logMeta}>
           <Text style={styles.logStyle}>{log.style}</Text>
+          {log.isGoldenHourLog && (
+            <View style={styles.logGoldenTag}>
+              <Text style={styles.logGoldenText}>🌅 2x</Text>
+            </View>
+          )}
           <Text style={styles.logDate}>
             {new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </Text>
@@ -203,19 +320,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 2,
   },
-  streakRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 5,
-    marginTop: 8,
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
     backgroundColor: 'rgba(255, 107, 53, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  streakInfo: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
   },
   streakValue: {
     color: '#FF6B35',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800' as const,
   },
   streakLabel: {
@@ -224,16 +348,28 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     opacity: 0.8,
   },
+  bestStreak: {
+    marginLeft: 4,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  bestStreakText: {
+    color: 'rgba(255, 107, 53, 0.7)',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
   titlesRow: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    justifyContent: 'center' as const,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 6,
     marginTop: 8,
   },
   profileTitleBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     paddingHorizontal: 10,
@@ -288,7 +424,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
     color: Colors.white,
@@ -302,8 +438,133 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     marginBottom: 12,
   },
-  badgeList: {
-    gap: 10,
+  tierSection: {
+    marginBottom: 20,
+  },
+  tierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tierDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  tierLabel: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  },
+  tierLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.darkBorder,
+  },
+  pathGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  pathNodeWrap: {
+    width: 80,
+    alignItems: 'center',
+  },
+  pathConnector: {
+    position: 'absolute',
+    top: 28,
+    left: -12,
+    width: 12,
+    height: 2,
+    backgroundColor: Colors.darkBorder,
+  },
+  pathConnectorActive: {
+    backgroundColor: Colors.gold,
+  },
+  pathNode: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.darkElevated,
+    borderWidth: 2,
+    borderColor: Colors.darkBorder,
+    marginBottom: 6,
+  },
+  pathNodeEarned: {
+    borderColor: Colors.gold,
+    backgroundColor: 'rgba(212, 168, 75, 0.12)',
+  },
+  pathNodeLocked: {
+    opacity: 0.4,
+    borderColor: Colors.grayLight,
+  },
+  pathNodeAvailable: {
+    borderColor: Colors.goldMuted,
+    borderStyle: 'dashed' as const,
+  },
+  pathIcon: {
+    fontSize: 24,
+  },
+  pathIconLocked: {
+    opacity: 0.3,
+  },
+  lockOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.darkCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.darkBorder,
+  },
+  pathName: {
+    color: Colors.whiteMuted,
+    fontSize: 10,
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    lineHeight: 13,
+  },
+  pathNameEarned: {
+    color: Colors.gold,
+  },
+  pathNameLocked: {
+    color: Colors.grayLight,
+  },
+  miniProgress: {
+    width: '100%',
+    marginTop: 4,
+    alignItems: 'center',
+    gap: 2,
+  },
+  miniProgressTrack: {
+    width: '100%',
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.darkBorder,
+    overflow: 'hidden',
+  },
+  miniProgressFill: {
+    height: '100%',
+    borderRadius: 1.5,
+  },
+  miniProgressText: {
+    color: Colors.gray,
+    fontSize: 8,
+    fontWeight: '600' as const,
+  },
+  prereqText: {
+    color: Colors.grayLight,
+    fontSize: 8,
+    marginTop: 2,
+    textAlign: 'center' as const,
   },
   logItem: {
     flexDirection: 'row',
@@ -338,6 +599,17 @@ const styles = StyleSheet.create({
     color: Colors.goldMuted,
     fontSize: 12,
     fontWeight: '500' as const,
+  },
+  logGoldenTag: {
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  logGoldenText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '700' as const,
   },
   logDate: {
     color: Colors.gray,

@@ -24,6 +24,7 @@ export const ALL_BADGES: Badge[] = [
     earned: true,
     earnedDate: '2024-11-15',
     requirement: '1 martini logged',
+    tier: 'bronze',
   },
   {
     id: 'stirred_not_shaken',
@@ -33,6 +34,8 @@ export const ALL_BADGES: Badge[] = [
     earned: true,
     earnedDate: '2024-12-01',
     requirement: '5 bars visited',
+    tier: 'bronze',
+    prerequisiteId: 'first_martini',
   },
   {
     id: 'dirty_dozen',
@@ -42,6 +45,8 @@ export const ALL_BADGES: Badge[] = [
     earned: true,
     earnedDate: '2025-01-10',
     requirement: '12 martinis logged',
+    tier: 'silver',
+    prerequisiteId: 'first_martini',
   },
   {
     id: 'olive_branch',
@@ -51,6 +56,7 @@ export const ALL_BADGES: Badge[] = [
     earned: true,
     earnedDate: '2025-01-22',
     requirement: 'Rate a martini 5 olives',
+    tier: 'bronze',
   },
   {
     id: 'connoisseur',
@@ -59,6 +65,8 @@ export const ALL_BADGES: Badge[] = [
     icon: '🎩',
     earned: false,
     requirement: '4+ average rating',
+    tier: 'silver',
+    prerequisiteId: 'olive_branch',
   },
   {
     id: 'night_owl',
@@ -67,6 +75,7 @@ export const ALL_BADGES: Badge[] = [
     icon: '🦉',
     earned: false,
     requirement: 'Log after midnight',
+    tier: 'silver',
   },
   {
     id: 'globe_trotter',
@@ -75,6 +84,8 @@ export const ALL_BADGES: Badge[] = [
     icon: '🌍',
     earned: false,
     requirement: '3 cities visited',
+    tier: 'silver',
+    prerequisiteId: 'stirred_not_shaken',
   },
   {
     id: 'top_shelf',
@@ -83,6 +94,27 @@ export const ALL_BADGES: Badge[] = [
     icon: '🏆',
     earned: false,
     requirement: '50 martinis logged',
+    tier: 'gold',
+    prerequisiteId: 'dirty_dozen',
+  },
+  {
+    id: 'golden_hour',
+    name: 'Golden Hour',
+    description: 'Log during the Golden Hour window',
+    icon: '🌅',
+    earned: false,
+    requirement: 'Log during Golden Hour (5-6 PM)',
+    tier: 'gold',
+  },
+  {
+    id: 'filthy_rich',
+    name: 'Filthy Rich',
+    description: 'Master the Filthy martini path',
+    icon: '💎',
+    earned: false,
+    requirement: 'Log 5 Filthy martinis',
+    tier: 'gold',
+    prerequisiteId: 'dirty_dozen',
   },
 ];
 
@@ -98,6 +130,7 @@ export const CURRENT_USER: User = {
   badges: ALL_BADGES,
   joinedDate: '2024-11-01',
   streakCount: 5,
+  longestStreak: 8,
   lastLogDate: '2025-02-17T19:45:00Z',
 };
 

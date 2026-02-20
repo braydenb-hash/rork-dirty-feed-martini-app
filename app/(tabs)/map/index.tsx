@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Platform,
   ScrollView,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +35,37 @@ const NYC_REGION = {
   latitudeDelta: 0.08,
   longitudeDelta: 0.08,
 };
+
+function LiveHalo() {
+  const haloScale = useRef(new Animated.Value(1)).current;
+  const haloOpacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(haloScale, { toValue: 1.8, duration: 1500, useNativeDriver: true }),
+          Animated.timing(haloScale, { toValue: 1, duration: 0, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(haloOpacity, { toValue: 0, duration: 1500, useNativeDriver: true }),
+          Animated.timing(haloOpacity, { toValue: 0.6, duration: 0, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [haloScale, haloOpacity]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.liveHalo,
+        { transform: [{ scale: haloScale }], opacity: haloOpacity },
+      ]}
+    />
+  );
+}
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -190,7 +220,7 @@ export default function MapScreen() {
                     {isBarActive(bar.id) ? (
                       <>
                         <Zap size={12} color="#FFD700" fill="#FFD700" />
-                        <Text style={styles.webNowPouring}>Now Pouring</Text>
+                        <Text style={styles.webNowPouring}>Live · {getActiveCount(bar.id)} recent</Text>
                       </>
                     ) : (
                       <>
@@ -237,7 +267,7 @@ export default function MapScreen() {
               key={bar.id}
               coordinate={{ latitude: bar.latitude, longitude: bar.longitude }}
               title={bar.name}
-              description={active ? `🔥 Now Pouring · ${getActiveCount(bar.id)} recent` : `${bar.communityRating.toFixed(1)} ⭐ · ${bar.topDrink}`}
+              description={active ? `🔥 Live · ${getActiveCount(bar.id)} recent` : `${bar.communityRating.toFixed(1)} ⭐ · ${bar.topDrink}`}
               onPress={() => handleMarkerPress(bar)}
               pinColor={active ? '#FFD700' : bar.communityRating >= 4.5 ? Colors.gold : bar.communityRating >= 4.0 ? Colors.goldLight : Colors.goldMuted}
             />
@@ -292,11 +322,14 @@ export default function MapScreen() {
             </Pressable>
 
             <View style={styles.cardRow}>
-              <Image
-                source={{ uri: selectedBar.photo }}
-                style={styles.cardImage}
-                contentFit="cover"
-              />
+              <View>
+                <Image
+                  source={{ uri: selectedBar.photo }}
+                  style={styles.cardImage}
+                  contentFit="cover"
+                />
+                {isBarActive(selectedBar.id) && <LiveHalo />}
+              </View>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardName} numberOfLines={1}>{selectedBar.name}</Text>
                 <View style={styles.cardLocationRow}>
@@ -312,8 +345,10 @@ export default function MapScreen() {
             {isBarActive(selectedBar.id) && (
               <View style={styles.nowPouringBanner}>
                 <Zap size={14} color="#FFD700" fill="#FFD700" />
-                <Text style={styles.nowPouringText}>Now Pouring</Text>
-                <Text style={styles.nowPouringCount}>{getActiveCount(selectedBar.id)} logged recently</Text>
+                <Text style={styles.nowPouringText}>Live</Text>
+                <Text style={styles.nowPouringCount}>
+                  {getActiveCount(selectedBar.id)} logged in last 2 hours
+                </Text>
               </View>
             )}
 
@@ -445,6 +480,17 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 14,
   },
+  liveHalo: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+  },
   cardInfo: {
     flex: 1,
     justifyContent: 'center',
@@ -557,8 +603,8 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
   nowPouringBanner: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 215, 0, 0.08)',
     borderRadius: 10,
     paddingVertical: 8,
@@ -582,15 +628,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   webActiveDot: {
-    position: 'absolute' as const,
+    position: 'absolute',
     top: -4,
     right: -4,
     width: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   webNowPouring: {
     color: '#FFD700',

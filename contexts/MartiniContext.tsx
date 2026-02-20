@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { MartiniLog, Badge, Comment, LeaderboardEntry, LeaderboardTitle } from '@/types';
+import { MartiniLog, Badge, Comment, LeaderboardEntry, LeaderboardTitle, BarMayorship } from '@/types';
 import { MOCK_FEED, MY_LOGS, CURRENT_USER, ALL_BADGES, MOCK_USER_STREAKS } from '@/mocks/data';
 
 const LOGS_KEY = 'dirty_feed_logs';
@@ -12,12 +12,13 @@ const STREAK_KEY = 'dirty_feed_streak';
 
 interface StreakData {
   count: number;
+  longest: number;
   lastLogDate: string | null;
 }
 
 function computeStreak(currentStreak: StreakData, newLogTimestamp: string): StreakData {
   if (!currentStreak.lastLogDate) {
-    return { count: 1, lastLogDate: newLogTimestamp };
+    return { count: 1, longest: Math.max(currentStreak.longest, 1), lastLogDate: newLogTimestamp };
   }
 
   const lastLog = new Date(currentStreak.lastLogDate);
@@ -25,13 +26,46 @@ function computeStreak(currentStreak: StreakData, newLogTimestamp: string): Stre
   const diffMs = newLog.getTime() - lastLog.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
 
+  let newCount = currentStreak.count;
   if (diffHours >= 24 && diffHours <= 48) {
-    return { count: currentStreak.count + 1, lastLogDate: newLogTimestamp };
+    newCount = currentStreak.count + 1;
   } else if (diffHours < 24) {
-    return { count: currentStreak.count, lastLogDate: newLogTimestamp };
+    newCount = currentStreak.count;
   } else {
-    return { count: 1, lastLogDate: newLogTimestamp };
+    newCount = 1;
   }
+
+  return {
+    count: newCount,
+    longest: Math.max(currentStreak.longest, newCount),
+    lastLogDate: newLogTimestamp,
+  };
+}
+
+function checkGoldenHour(): boolean {
+  const now = new Date();
+  const hour = now.getHours();
+  return hour >= 17 && hour < 18;
+}
+
+function getGoldenHourEnd(): Date {
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(18, 0, 0, 0);
+  if (now >= end) {
+    end.setDate(end.getDate() + 1);
+  }
+  return end;
+}
+
+function getGoldenHourStart(): Date {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(17, 0, 0, 0);
+  if (now.getHours() >= 18) {
+    start.setDate(start.getDate() + 1);
+  }
+  return start;
 }
 
 const TITLE_MAP: Record<string, LeaderboardTitle> = {
@@ -48,9 +82,33 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState<Badge[]>([]);
   const [streakData, setStreakData] = useState<StreakData>({
     count: CURRENT_USER.streakCount,
+    longest: CURRENT_USER.longestStreak,
     lastLogDate: CURRENT_USER.lastLogDate ?? null,
   });
+  const [isGoldenHour, setIsGoldenHour] = useState<boolean>(checkGoldenHour());
+  const [goldenHourCountdown, setGoldenHourCountdown] = useState<number>(0);
   const previousBadgeIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const updateGoldenHour = () => {
+      const active = checkGoldenHour();
+      setIsGoldenHour(active);
+
+      if (active) {
+        const end = getGoldenHourEnd();
+        const remaining = Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000));
+        setGoldenHourCountdown(remaining);
+      } else {
+        const start = getGoldenHourStart();
+        const until = Math.max(0, Math.floor((start.getTime() - Date.now()) / 1000));
+        setGoldenHourCountdown(until);
+      }
+    };
+
+    updateGoldenHour();
+    const interval = setInterval(updateGoldenHour, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const myLogsQuery = useQuery({
     queryKey: ['myLogs'],
@@ -81,7 +139,7 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
       if (stored) {
         return JSON.parse(stored) as StreakData;
       }
-      return { count: CURRENT_USER.streakCount, lastLogDate: CURRENT_USER.lastLogDate ?? null };
+      return { count: CURRENT_USER.streakCount, longest: CURRENT_USER.longestStreak, lastLogDate: CURRENT_USER.lastLogDate ?? null };
     },
   });
 
@@ -153,6 +211,8 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
       const hour = new Date(l.timestamp).getHours();
       return hour >= 0 && hour < 5;
     });
+    const hasGoldenHourLog = logs.some(l => l.isGoldenHourLog === true);
+    const filthyCount = logs.filter(l => l.style === 'Filthy').length;
 
     return ALL_BADGES.map(badge => {
       let earned = false;
@@ -200,6 +260,16 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
           progress = Math.min(totalMartinis, 50);
           progressMax = 50;
           break;
+        case 'golden_hour':
+          earned = hasGoldenHourLog;
+          progress = hasGoldenHourLog ? 1 : 0;
+          progressMax = 1;
+          break;
+        case 'filthy_rich':
+          earned = filthyCount >= 5;
+          progress = Math.min(filthyCount, 5);
+          progressMax = 5;
+          break;
         default:
           earned = badge.earned;
           break;
@@ -229,8 +299,15 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   }, [badges]);
 
   const addLog = useCallback((log: MartiniLog) => {
-    const updatedMyLogs = [log, ...myLogs];
-    const updatedFeed = [log, ...feedLogs];
+    const isGH = checkGoldenHour();
+    const enrichedLog: MartiniLog = {
+      ...log,
+      isGoldenHourLog: isGH,
+      likes: isGH ? (log.likes || 0) + 2 : log.likes,
+    };
+
+    const updatedMyLogs = [enrichedLog, ...myLogs];
+    const updatedFeed = [enrichedLog, ...feedLogs];
     setMyLogs(updatedMyLogs);
     setFeedLogs(updatedFeed);
     saveMutation.mutate(updatedMyLogs);
@@ -239,7 +316,10 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     const newStreak = computeStreak(streakData, log.timestamp);
     setStreakData(newStreak);
     saveStreakMutation.mutate(newStreak);
-    console.log('Streak updated:', newStreak.count);
+    console.log('Streak updated:', newStreak.count, '| Longest:', newStreak.longest);
+    if (isGH) {
+      console.log('Golden Hour bonus applied!');
+    }
 
     console.log('Added martini log:', log.id);
     return computeBadges(updatedMyLogs).filter(b => b.earned && !previousBadgeIds.current.has(b.id));
@@ -302,14 +382,53 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   }, [streakData.count, user.id]);
 
   const activeBars = useMemo(() => {
-    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const barActivity: Record<string, number> = {};
     feedLogs.forEach(log => {
-      if (log.timestamp >= threeHoursAgo) {
+      if (log.timestamp >= twoHoursAgo) {
         barActivity[log.barId] = (barActivity[log.barId] || 0) + 1;
       }
     });
     return barActivity;
+  }, [feedLogs]);
+
+  const barMayorships = useMemo(() => {
+    const barUserCounts: Record<string, Record<string, { count: number; name: string; avatar: string }>> = {};
+    feedLogs.forEach(log => {
+      if (!barUserCounts[log.barId]) {
+        barUserCounts[log.barId] = {};
+      }
+      if (!barUserCounts[log.barId][log.userId]) {
+        barUserCounts[log.barId][log.userId] = { count: 0, name: log.userName, avatar: log.userAvatar };
+      }
+      barUserCounts[log.barId][log.userId].count++;
+    });
+
+    const mayorships: Record<string, BarMayorship> = {};
+    Object.entries(barUserCounts).forEach(([barId, users]) => {
+      let topUserId = '';
+      let topCount = 0;
+      let topName = '';
+      let topAvatar = '';
+      Object.entries(users).forEach(([userId, data]) => {
+        if (data.count > topCount) {
+          topCount = data.count;
+          topUserId = userId;
+          topName = data.name;
+          topAvatar = data.avatar;
+        }
+      });
+      if (topUserId) {
+        mayorships[barId] = {
+          barId,
+          userId: topUserId,
+          userName: topName,
+          userAvatar: topAvatar,
+          logCount: topCount,
+        };
+      }
+    });
+    return mayorships;
   }, [feedLogs]);
 
   const leaderboards = useMemo(() => {
@@ -400,7 +519,13 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
   return {
     feedLogs,
     myLogs,
-    user: { ...user, badges, streakCount: streakData.count, lastLogDate: streakData.lastLogDate ?? undefined },
+    user: {
+      ...user,
+      badges,
+      streakCount: streakData.count,
+      longestStreak: streakData.longest,
+      lastLogDate: streakData.lastLogDate ?? undefined,
+    },
     addLog,
     deleteLog,
     toggleLike,
@@ -414,5 +539,8 @@ export const [MartiniProvider, useMartini] = createContextHook(() => {
     userStreaks,
     activeBars,
     userTitles,
+    isGoldenHour,
+    goldenHourCountdown,
+    barMayorships,
   };
 });

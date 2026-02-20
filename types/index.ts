@@ -10,6 +10,7 @@ export interface User {
   badges: Badge[];
   joinedDate: string;
   streakCount: number;
+  longestStreak: number;
   lastLogDate?: string;
 }
 
@@ -29,6 +30,7 @@ export interface MartiniLog {
   likes: number;
   liked: boolean;
   comments?: Comment[];
+  isGoldenHourLog?: boolean;
 }
 
 export interface Bar {
@@ -54,6 +56,8 @@ export interface Badge {
   requirement: string;
   progress?: number;
   progressMax?: number;
+  tier?: 'bronze' | 'silver' | 'gold';
+  prerequisiteId?: string;
 }
 
 export interface Comment {
@@ -78,3 +82,11 @@ export interface LeaderboardEntry {
 }
 
 export type LeaderboardTitle = 'The Brine King' | 'The Golden Garnish' | 'The Urban Legend';
+
+export interface BarMayorship {
+  barId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  logCount: number;
+}

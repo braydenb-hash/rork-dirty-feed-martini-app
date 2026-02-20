@@ -1,10 +1,10 @@
-import React, { useCallback, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, FlatList, StyleSheet, Text, RefreshControl,
   TextInput, Pressable, ScrollView, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, X, SlidersHorizontal } from 'lucide-react-native';
+import { Search, X, SlidersHorizontal, Clock, Sunrise } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useMartini } from '@/contexts/MartiniContext';
@@ -16,8 +16,17 @@ import { MARTINI_STYLES } from '@/mocks/data';
 const CITIES = ['All', 'New York', 'Brooklyn', 'Manhattan', 'Chicago'];
 const RATING_FILTERS = ['All', '5 🫒', '4+ 🫒', '3+ 🫒'];
 
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export default function FeedScreen() {
-  const { feedLogs, toggleLike, addComment, isLoading, refreshFeed, userStreaks } = useMartini();
+  const {
+    feedLogs, toggleLike, addComment, isLoading, refreshFeed,
+    userStreaks, isGoldenHour, goldenHourCountdown,
+  } = useMartini();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +35,20 @@ export default function FeedScreen() {
   const [selectedStyle, setSelectedStyle] = useState('All');
   const [selectedRating, setSelectedRating] = useState('All');
   const filterHeight = useRef(new Animated.Value(0)).current;
+  const goldenPulse = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    if (isGoldenHour) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(goldenPulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+          Animated.timing(goldenPulse, { toValue: 0.6, duration: 1200, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [isGoldenHour, goldenPulse]);
 
   const toggleFilters = useCallback(() => {
     Haptics.selectionAsync();
@@ -141,6 +164,36 @@ export default function FeedScreen() {
         }
         ListHeaderComponent={
           <View>
+            {isGoldenHour ? (
+              <Animated.View style={[styles.goldenBanner, { opacity: goldenPulse }]}>
+                <View style={styles.goldenBannerInner}>
+                  <View style={styles.goldenLeft}>
+                    <Sunrise size={22} color="#FFD700" />
+                    <View>
+                      <Text style={styles.goldenTitle}>Golden Hour is LIVE</Text>
+                      <Text style={styles.goldenSub}>Log now for 2x bonus points!</Text>
+                    </View>
+                  </View>
+                  <View style={styles.goldenTimer}>
+                    <Clock size={14} color="#FFD700" />
+                    <Text style={styles.goldenTimerText}>{formatCountdown(goldenHourCountdown)}</Text>
+                  </View>
+                </View>
+              </Animated.View>
+            ) : (
+              <View style={styles.goldenPreview}>
+                <View style={styles.goldenPreviewInner}>
+                  <Sunrise size={16} color={Colors.goldMuted} />
+                  <Text style={styles.goldenPreviewText}>
+                    Golden Hour {goldenHourCountdown < 3600
+                      ? `in ${formatCountdown(goldenHourCountdown)}`
+                      : 'today at 5 PM'}
+                  </Text>
+                  <Clock size={12} color={Colors.gray} />
+                </View>
+              </View>
+            )}
+
             <View style={styles.headerBanner}>
               <Text style={styles.headerEmoji}>🍸</Text>
               <Text style={styles.headerTitle}>What's being poured</Text>
@@ -265,6 +318,76 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 20,
+  },
+  goldenBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  goldenBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  goldenLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  goldenTitle: {
+    color: '#FFD700',
+    fontSize: 15,
+    fontWeight: '800' as const,
+    letterSpacing: 0.3,
+  },
+  goldenSub: {
+    color: 'rgba(255, 215, 0, 0.7)',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  goldenTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  goldenTimerText: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: '700' as const,
+    fontVariant: ['tabular-nums'],
+  },
+  goldenPreview: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  goldenPreviewInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.darkCard,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: Colors.darkBorder,
+  },
+  goldenPreviewText: {
+    color: Colors.goldMuted,
+    fontSize: 13,
+    fontWeight: '500' as const,
+    flex: 1,
   },
   headerBanner: {
     paddingHorizontal: 20,
