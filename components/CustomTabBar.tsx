@@ -5,6 +5,7 @@ import { Wine, Map as MapIcon, Plus, Trophy, User as UserIcon } from 'lucide-rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Fonts } from '@/constants/themes';
 
 interface TabState {
   index: number;
@@ -136,9 +137,10 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '600' as const,
-    letterSpacing: 0.3,
+    fontSize: 7,
+    fontFamily: Fonts.data,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase' as const,
   },
   activeIndicator: {
     position: 'absolute' as const,
