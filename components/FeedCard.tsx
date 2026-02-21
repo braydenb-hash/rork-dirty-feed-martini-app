@@ -1,11 +1,12 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, TextInput, Share, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { Heart, MapPin, Clock, MessageCircle, Send, Share2, Flame } from 'lucide-react-native';
+import { Heart, MapPin, Clock, MessageCircle, Send, Share2, Flame, Sunrise } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Colors from '@/constants/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Fonts } from '@/constants/themes';
 import { MartiniLog, Comment } from '@/types';
-import { Sunrise } from 'lucide-react-native';
 import OliveRating from './OliveRating';
 
 interface FeedCardProps {
@@ -15,6 +16,7 @@ interface FeedCardProps {
   onBarPress?: (barId: string) => void;
   onUserPress?: (userId: string) => void;
   streakCount?: number;
+  xpProgress?: number;
 }
 
 function formatTimeAgo(timestamp: string): string {
@@ -30,12 +32,15 @@ function formatTimeAgo(timestamp: string): string {
   return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streakCount }: FeedCardProps) {
+function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streakCount, xpProgress }: FeedCardProps) {
+  const { theme } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const flamePulse = useRef(new Animated.Value(1)).current;
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const comments = log.comments ?? [];
+
+  const xp = xpProgress ?? (log.rating / 5);
 
   React.useEffect(() => {
     if (streakCount && streakCount >= 3) {
@@ -52,10 +57,19 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
 
   const handleLike = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 1.3, duration: 100, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-    ]).start();
+    Animated.spring(scaleAnim, {
+      toValue: 1.35,
+      friction: 3,
+      tension: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: true,
+      }).start();
+    });
     onLike(log.id);
   }, [log.id, onLike, scaleAnim]);
 
@@ -83,15 +97,43 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
   }, []);
 
   return (
-    <View style={styles.card} testID={`feed-card-${log.id}`}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.cardBg,
+          borderColor: theme.bgBorder,
+        },
+      ]}
+      testID={`feed-card-${log.id}`}
+    >
+      <View style={[styles.xpBarContainer, { backgroundColor: theme.xpBarBg }]}>
+        <View
+          style={[
+            styles.xpBarFill,
+            {
+              backgroundColor: theme.xpBar,
+              width: `${Math.min(xp * 100, 100)}%`,
+            },
+          ]}
+        />
+      </View>
+
+      <LinearGradient
+        colors={[theme.glassHighlight, 'transparent']}
+        style={styles.glassHighlight}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+
       <View style={styles.header}>
         <Pressable onPress={() => onUserPress?.(log.userId)}>
-          <Image source={{ uri: log.userAvatar }} style={styles.avatar} />
+          <Image source={{ uri: log.userAvatar }} style={[styles.avatar, { borderColor: theme.accentMuted }]} />
         </Pressable>
         <View style={styles.headerText}>
           <View style={styles.userNameRow}>
             <Pressable onPress={() => onUserPress?.(log.userId)}>
-              <Text style={styles.userName}>{log.userName}</Text>
+              <Text style={[styles.userName, { color: theme.textPrimary, fontFamily: Fonts.prestigeRegular }]}>{log.userName}</Text>
             </Pressable>
             {streakCount != null && streakCount > 0 && (
               <Animated.View style={[styles.streakBadge, { transform: [{ scale: streakCount >= 3 ? flamePulse : 1 }] }]}>
@@ -101,15 +143,15 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
             )}
           </View>
           <View style={styles.locationRow}>
-            <MapPin size={12} color={Colors.goldMuted} />
+            <MapPin size={12} color={theme.accentMuted} />
             <Pressable onPress={() => onBarPress?.(log.barId)}>
-              <Text style={styles.barName}>{log.barName}</Text>
+              <Text style={[styles.barName, { color: theme.accent, fontFamily: Fonts.dataLight }]}>{log.barName}</Text>
             </Pressable>
           </View>
         </View>
         <View style={styles.timeContainer}>
-          <Clock size={11} color={Colors.gray} />
-          <Text style={styles.timeText}>{formatTimeAgo(log.timestamp)}</Text>
+          <Clock size={11} color={theme.textDim} />
+          <Text style={[styles.timeText, { color: theme.textDim, fontFamily: Fonts.dataLight }]}>{formatTimeAgo(log.timestamp)}</Text>
         </View>
       </View>
 
@@ -118,17 +160,17 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
       <View style={styles.content}>
         <View style={styles.ratingRow}>
           <OliveRating rating={log.rating} size={16} />
-          <View style={styles.styleBadge}>
-            <Text style={styles.styleText}>{log.style}</Text>
+          <View style={[styles.styleBadge, { backgroundColor: theme.bgElevated, borderColor: theme.accentMuted }]}>
+            <Text style={[styles.styleText, { color: theme.accentLight, fontFamily: Fonts.data }]}>{log.style}</Text>
           </View>
         </View>
 
-        <Text style={styles.notes} numberOfLines={3}>{log.notes}</Text>
+        <Text style={[styles.notes, { color: theme.textSecondary, fontFamily: Fonts.prestigeRegular }]} numberOfLines={3}>{log.notes}</Text>
 
         {log.isGoldenHourLog && (
           <View style={styles.goldenHourChip}>
             <Sunrise size={11} color="#FFD700" />
-            <Text style={styles.goldenHourChipText}>Golden Hour · 2x</Text>
+            <Text style={[styles.goldenHourChipText, { fontFamily: Fonts.dataBold }]}>Golden Hour · 2x</Text>
           </View>
         )}
 
@@ -138,54 +180,54 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 <Heart
                   size={20}
-                  color={log.liked ? '#E25555' : Colors.gray}
+                  color={log.liked ? '#E25555' : theme.textMuted}
                   fill={log.liked ? '#E25555' : 'transparent'}
                 />
               </Animated.View>
-              <Text style={[styles.actionCount, log.liked && styles.likeCountActive]}>
+              <Text style={[styles.actionCount, { color: log.liked ? '#E25555' : theme.textMuted, fontFamily: Fonts.data }]}>
                 {log.likes}
               </Text>
             </Pressable>
 
             <Pressable onPress={toggleComments} style={styles.actionButton} hitSlop={10}>
-              <MessageCircle size={19} color={comments.length > 0 ? Colors.goldLight : Colors.gray} />
+              <MessageCircle size={19} color={comments.length > 0 ? theme.accent : theme.textMuted} />
               {comments.length > 0 && (
-                <Text style={styles.actionCountGold}>{comments.length}</Text>
+                <Text style={[styles.actionCountAccent, { color: theme.accent, fontFamily: Fonts.data }]}>{comments.length}</Text>
               )}
             </Pressable>
 
             <Pressable onPress={handleShare} style={styles.actionButton} hitSlop={10}>
-              <Share2 size={18} color={Colors.gray} />
+              <Share2 size={18} color={theme.textMuted} />
             </Pressable>
           </View>
-          <Text style={styles.cityText}>{log.city}</Text>
+          <Text style={[styles.cityText, { color: theme.textDim, fontFamily: Fonts.dataLight }]}>{log.city}</Text>
         </View>
 
         {showComments && (
-          <View style={styles.commentsSection}>
+          <View style={[styles.commentsSection, { borderTopColor: theme.bgBorder }]}>
             {comments.length > 0 && (
               <View style={styles.commentsList}>
                 {comments.slice(-3).map(comment => (
                   <View key={comment.id} style={styles.commentRow}>
                     <Image source={{ uri: comment.userAvatar }} style={styles.commentAvatar} />
-                    <View style={styles.commentBubble}>
-                      <Text style={styles.commentUser}>{comment.userName}</Text>
-                      <Text style={styles.commentTextDisplay}>{comment.text}</Text>
+                    <View style={[styles.commentBubble, { backgroundColor: theme.bgElevated }]}>
+                      <Text style={[styles.commentUser, { color: theme.accent, fontFamily: Fonts.dataBold }]}>{comment.userName}</Text>
+                      <Text style={[styles.commentTextDisplay, { color: theme.textSecondary }]}>{comment.text}</Text>
                     </View>
                   </View>
                 ))}
                 {comments.length > 3 && (
-                  <Text style={styles.moreComments}>
+                  <Text style={[styles.moreComments, { color: theme.textMuted, fontFamily: Fonts.data }]}>
                     View all {comments.length} comments
                   </Text>
                 )}
               </View>
             )}
-            <View style={styles.commentInput}>
+            <View style={[styles.commentInput, { backgroundColor: theme.bgElevated }]}>
               <TextInput
-                style={styles.commentTextInput}
+                style={[styles.commentTextInput, { color: theme.textPrimary }]}
                 placeholder="Add a comment..."
-                placeholderTextColor={Colors.gray}
+                placeholderTextColor={theme.textMuted}
                 value={commentText}
                 onChangeText={setCommentText}
                 onSubmitEditing={handleSubmitComment}
@@ -193,7 +235,7 @@ function FeedCardInner({ log, onLike, onComment, onBarPress, onUserPress, streak
               />
               {commentText.trim().length > 0 && (
                 <Pressable onPress={handleSubmitComment} style={styles.commentSend} hitSlop={8}>
-                  <Send size={16} color={Colors.gold} />
+                  <Send size={16} color={theme.accent} />
                 </Pressable>
               )}
             </View>
@@ -208,13 +250,23 @@ export default React.memo(FeedCardInner);
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.darkCard,
     borderRadius: 16,
     marginHorizontal: 16,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.darkBorder,
+  },
+  xpBarContainer: {
+    height: 2,
+    width: '100%',
+  },
+  xpBarFill: {
+    height: 2,
+    borderRadius: 1,
+  },
+  glassHighlight: {
+    height: 1,
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -226,14 +278,12 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: Colors.goldMuted,
   },
   headerText: {
     flex: 1,
     marginLeft: 10,
   },
   userName: {
-    color: Colors.white,
     fontSize: 15,
     fontWeight: '600' as const,
   },
@@ -263,9 +313,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   barName: {
-    color: Colors.gold,
     fontSize: 13,
-    fontWeight: '500' as const,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -273,7 +321,6 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   timeText: {
-    color: Colors.gray,
     fontSize: 12,
   },
   photo: {
@@ -290,20 +337,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   styleBadge: {
-    backgroundColor: Colors.darkElevated,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.goldMuted,
   },
   styleText: {
-    color: Colors.goldLight,
     fontSize: 12,
     fontWeight: '600' as const,
   },
   notes: {
-    color: Colors.whiteMuted,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
@@ -324,20 +367,14 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   actionCount: {
-    color: Colors.gray,
     fontSize: 14,
     fontWeight: '500' as const,
   },
-  actionCountGold: {
-    color: Colors.goldLight,
+  actionCountAccent: {
     fontSize: 13,
     fontWeight: '500' as const,
   },
-  likeCountActive: {
-    color: '#E25555',
-  },
   cityText: {
-    color: Colors.gray,
     fontSize: 12,
   },
   goldenHourChip: {
@@ -359,7 +396,6 @@ const styles = StyleSheet.create({
   commentsSection: {
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.darkBorder,
     paddingTop: 12,
   },
   commentsList: {
@@ -378,24 +414,20 @@ const styles = StyleSheet.create({
   },
   commentBubble: {
     flex: 1,
-    backgroundColor: Colors.darkElevated,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   commentUser: {
-    color: Colors.goldLight,
     fontSize: 12,
     fontWeight: '600' as const,
     marginBottom: 1,
   },
   commentTextDisplay: {
-    color: Colors.whiteMuted,
     fontSize: 13,
     lineHeight: 17,
   },
   moreComments: {
-    color: Colors.gray,
     fontSize: 12,
     fontWeight: '500' as const,
     paddingLeft: 32,
@@ -403,7 +435,6 @@ const styles = StyleSheet.create({
   commentInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.darkElevated,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -411,7 +442,6 @@ const styles = StyleSheet.create({
   },
   commentTextInput: {
     flex: 1,
-    color: Colors.white,
     fontSize: 13,
     padding: 0,
   },
